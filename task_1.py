@@ -1,24 +1,40 @@
 import threading
 import time
+from queue import Queue
+
+# Функція для створення тестових файлів
+def create_test_files():
+    # Створюємо файли з текстовими даними
+    with open('file1.txt', 'w', encoding='utf-8') as f:
+        f.write('Це тестовий файл із ключовим словом слово1.\n')
+
+    with open('file2.txt', 'w', encoding='utf-8') as f:
+        f.write('Тут знаходиться ключове слово слово2.\n')
+
+    with open('file3.txt', 'w', encoding='utf-8') as f:
+        f.write('У цьому файлі є два ключові слова: слово1 і слово2.\n')
 
 # Функція для пошуку ключових слів у файлі
-def find_keywords_in_file(filename, keywords, results, thread_id):
-    # Відкриваємо файл для читання
-    with open(filename, 'r', encoding='utf-8') as file:
-        content = file.read()
-        for keyword in keywords:
-            # Якщо знайдено ключове слово, додаємо до результатів
-            if keyword in content:
-                results[thread_id].append((filename, keyword))
+def find_keywords_in_file(filename, keywords, queue):
+    try:
+        # Відкриваємо файл для читання
+        with open(filename, 'r', encoding='utf-8') as file:
+            content = file.read()
+            for keyword in keywords:
+                # Якщо знайдено ключове слово, додаємо до черги
+                if keyword in content:
+                    queue.put((filename, keyword))
+    except FileNotFoundError:
+        print(f"Файл {filename} не знайдено!")
 
-# Основна функція для багатопотокової обробки файлів
-def multithreading_search(file_list, keywords):
+# Основна функція для багатопотокової обробки файлів з використанням черги
+def multithreading_search_with_queue(file_list, keywords):
     threads = []
-    results = [[] for _ in range(len(file_list))]
+    queue = Queue()  # Створюємо чергу для результатів
     
     # Стартуємо потоки для кожного файлу
-    for i, filename in enumerate(file_list):
-        thread = threading.Thread(target=find_keywords_in_file, args=(filename, keywords, results, i))
+    for filename in file_list:
+        thread = threading.Thread(target=find_keywords_in_file, args=(filename, keywords, queue))
         threads.append(thread)
         thread.start()
     
@@ -26,19 +42,31 @@ def multithreading_search(file_list, keywords):
     for thread in threads:
         thread.join()
     
+    # Збираємо всі результати з черги
+    results = []
+    while not queue.empty():
+        results.append(queue.get())
+    
     return results
 
-# Приклад використання
-file_list = ['file1.txt', 'file2.txt', 'file3.txt']  # Список файлів
-keywords = ['слово1', 'слово2']  # Ключові слова
-start_time = time.time()
-
-# Запуск багатопотокової обробки
-results = multithreading_search(file_list, keywords)
-
-# Виводимо результати пошуку
-for thread_id, res in enumerate(results):
-    print(f"Результати для потоку {thread_id}: {res}")
-
-end_time = time.time()
-print(f"Час виконання: {end_time - start_time} секунд")
+# Основна частина програми
+if __name__ == "__main__":
+    # Створюємо тестові файли
+    create_test_files()
+    
+    # Визначаємо список файлів і ключових слів
+    file_list = ['file1.txt', 'file2.txt', 'file3.txt']  # Список файлів
+    keywords = ['слово1', 'слово2']  # Ключові слова
+    
+    # Вимірюємо час виконання
+    start_time = time.time()
+    
+    # Запуск багатопотокової обробки з чергою
+    results = multithreading_search_with_queue(file_list, keywords)
+    
+    # Виводимо результати пошуку
+    for res in results:
+        print(f"Файл {res[0]} містить ключове слово: {res[1]}")
+    
+    end_time = time.time()
+    print(f"Час виконання: {end_time - start_time} секунд")
